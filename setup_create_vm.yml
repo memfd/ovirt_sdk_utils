@@ -1,0 +1,54 @@
+- hosts: engine
+  remote_user: root
+  gather_facts: no
+  vars:
+    ovirt_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          <encrypted-data>
+    ssh_key_file: "/root/.ssh/id_rsa"
+    ssh_key_pass: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          <encrypted-data>
+  pre_tasks:
+    - name: Unlock SSH key "{{ ssh_key_file }}"
+      expect:
+        command: ssh-add "{{ ssh_key_file }}"
+        responses:
+          passphrase: "{{ ssh_key_pass }}"
+      delegate_to: localhost
+      become: no
+      changed_when: no
+      no_log: true
+
+  roles:
+    - role: create_vm
+      vars:
+        ovirt_url: "https://ovirt-engine.example.com/ovirt-engine/api"
+        ovirt_username: "admin@internal"
+        vm_cluster: "Default"
+        vm_name: "autocreate_vm_arch_test"
+        vm_template: "linux.ArchLinux.x64.CloudInit"
+        vm_memory: "2GiB"
+        vm_cpu_cores: 4
+        vm_disk_size: "21474836480"
+        vm_storage_domain: "storage_SSD-01"
+        vm_network: "ovirtmgmt"
+        cloud_init_nic_ip_address: "172.19.146.4"
+        cloud_init_nic_netmask: "255.255.255.0"
+        cloud_init_nic_gateway: "172.19.146.1"
+        cloud_init_host_name: "autocreate_vm_arch_test.cloud.int"
+        cloud_init_nic_name: "enp1s0"
+        create_additional_disk: false  # Управление созданием дополнительного диска
+        additional_disk_name: "data-disk"
+        additional_disk_size: "50GiB"  # Размер диска
+        additional_disk_storage_domain: "data"  # Домен хранения
+        additional_disk_format: "cow"  # Тип диска: 'cow' (Thin Provision) или 'raw' (Preallocated)
+        additional_disk_interface: "virtio_scsi"  # Интерфейс диска
+ 
+  post_tasks:
+    # Optional, to remove the keys from the agent at the end:
+    - name: Lock SSH key "{{ ssh_key_file }}"
+      command: ssh-add -d "{{ ssh_key_file }}"
+      delegate_to: 127.0.0.1
+      become: no
+      changed_when: no

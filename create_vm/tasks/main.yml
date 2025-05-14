@@ -1,0 +1,93 @@
+---
+# Подключение к oVirt и проверка доступности API
+- name: Ensure connection to oVirt engine
+  ovirt_auth:
+    url: "{{ ovirt_url }}"
+    username: "{{ ovirt_username }}"
+    password: "{{ ovirt_password }}"
+    #ca_file: '/some/path/../../ovirt_otr.crt'
+
+# Создание ВМ из шаблона с cloud-init
+- name: Create VM from template with cloud-init
+  ovirt_vm:
+    name: "{{ vm_name }}"
+    template: "{{ vm_template }}"
+    cluster: "{{ vm_cluster }}"
+    clone: true
+    clone_permissions: true
+    memory: "{{ vm_memory }}"
+    cpu_cores: "{{ vm_cpu_cores }}"
+    storage_domain: "{{ vm_storage_domain }}"
+    nics:
+      - name: "nic1"  # Имя интерфейса, которое уже существует в шаблоне
+        network: "{{ vm_network }}"  # Новая сеть (например, другой VLAN)
+        interface: "virtio"  # Тип интерфейса (оставляем тот же, если не нужно менять)
+    cloud_init:
+#  ///   flag for Run Once ///
+      cloud_init_persist: true
+    state: "present"
+    auth: "{{ ovirt_auth }}"
+  register: vm_creation_result
+
+- name: Получение информации о ВМ
+  ovirt.ovirt.ovirt_vm_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "{{ vm_name }}"
+    follow: disk_attachments.disk
+  register: result
+
+# Правильно извлекаем ID bootable-диска
+- name: Извлекаем ID загрузочного диска
+  set_fact:
+    boot_disk_id: "{{ item.disk.id }}"
+  loop: "{{ result.ovirt_vms[0].disk_attachments }}"
+  when: item.bootable | bool
+
+# Переименовываем загрузочный диск по полученному ID
+- name: Переименовываем загрузочный диск
+  ovirt_disk:
+    auth: "{{ ovirt_auth }}"
+    id: "{{ boot_disk_id }}"
+    alias: "{{ vm_name }}-sda"
+    state: present
+
+# Создание дополнительного диска (условие выполнения)
+- name: Create additional disk for the VM
+  ovirt_disk:
+    auth: "{{ ovirt_auth }}"
+    name: "{{ additional_disk_name }}"
+    size: "{{ additional_disk_size }}"
+    storage_domain: "{{ additional_disk_storage_domain }}"
+    format: "{{ additional_disk_format }}"
+    interface: "{{ additional_disk_interface }}"
+    vm_name: "{{ vm_name }}"
+    state: "present"
+  when:
+    - vm_creation_result.changed
+    - create_additional_disk | bool  # Выполняется только если create_additional_disk == true
+
+# Запуск ВМ
+- name: Start the VM
+  ovirt.ovirt.ovirt_vm:
+    auth: "{{ ovirt_auth }}"
+    name: "{{ vm_name }}"
+    state: "{{ vm_state }}"
+    cloud_init:
+      host_name: "{{ cloud_init_host_name }}"
+      #user_name: "{{ cloud_init_user_name }}"
+      #root_password: "{{ cloud_init_root_password }}"
+      nic_boot_protocol: "{{ cloud_init_nic_boot_protocol }}"
+      nic_name: "{{ cloud_init_nic_name }}"
+      nic_ip_address: "{{ cloud_init_nic_ip_address }}"
+      nic_netmask: "{{ cloud_init_nic_netmask }}"
+      nic_gateway: "{{ cloud_init_nic_gateway }}"
+      dns_servers: "{{ cloud_init_dns_servers }}"
+      dns_search: "{{ cloud_init_dns_search }}"
+      custom_script: "{{ cloud_init_custom_script }}"
+  when: vm_creation_result.changed
+
+# Отключение от oVirt API
+- name: Logout from oVirt engine
+  ovirt_auth:
+    state: absent
+    ovirt_auth: "{{ ovirt_auth }}"

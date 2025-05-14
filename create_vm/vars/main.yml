@@ -1,0 +1,5 @@
+# Дополнительные параметры для настройки ВМ
+#vm_os_type: "rhel_7x64"
+#vm_boot_devices:
+#  - "hd"
+#  - "network"

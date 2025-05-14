@@ -1,0 +1,42 @@
+# Параметры подключения к oVirt
+ovirt_url: "https://ovirt-engine.example.com/ovirt-engine/api"
+ovirt_username: "admin@internal"
+ovirt_password: "your_password"
+#ovirt_ca_file: "/etc/pki/ovirt-engine/ca.pem"
+
+# Параметры ВМ
+vm_name: "example-vm"
+vm_template: "template-centos7"
+vm_cluster: "Default"
+vm_memory: "4GiB"  # Объем оперативной памяти
+vm_cpu_cores: 2    # Количество ядер CPU
+vm_disk_size: "20GiB"  # Размер диска
+vm_storage_domain: "storage_SSD-01" # Домен хранения системного диска
+vm_network: "ovirtmgmt"  # Сеть для ВМ
+vm_state: "running"  # Состояние ВМ после создания с учётом эксплуатации cloud-init
+vm_boot_devices:
+  - "hd"
+  - "network"
+
+# Параметры cloud-init
+cloud_init_dns_servers: "1.1.1.1"
+cloud_init_dns_search: "example.com"
+cloud_init_nic_boot_protocol: "static"
+cloud_init_nic_ip_address: "{{ ip }}"
+cloud_init_nic_netmask: "{{ net_mask }}"
+cloud_init_nic_gateway: "{{ net_gateway }}"
+cloud_init_nic_name: "enp1s0"
+cloud_init_host_name: "{{ vm_fqdn }}"
+cloud_init_user_name: "test"
+cloud_init_root_password: "some_pass123"
+cloud_init_custom_script: |
+  #!/bin/bash
+  touch /etc/cloud/cloud-init.disabled
+
+# Параметры дополнительного диска
+create_additional_disk: false  # Управление созданием дополнительного диска
+additional_disk_name: "data-disk"
+additional_disk_size: "50GiB"  # Размер диска
+additional_disk_storage_domain: "data"  # Домен хранения
+additional_disk_format: "cow"  # Тип диска: 'cow' (Thin Provision) или 'raw' (Preallocated)
+additional_disk_interface: "virtio_scsi"  # Интерфейс диска
